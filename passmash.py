@@ -57,6 +57,18 @@ def keyfile():
         key = f.read()
     return key
 
+def hashfile():
+    keyfile = os.path.expanduser('~/.ssh/passmash.hash')
+    if os.path.exists(keyfile):
+        with open(keyfile, 'rb') as f:
+            key = f.read()
+        return key
+
+def save_hashfile(hash):
+    keyfile = os.path.expanduser('~/.ssh/passmash.hash')
+    with open(keyfile, 'wb+') as f:
+        f.write(hash)
+
 def mash(key, url, password):
     h = hmac.new(key, password, sha256)
     h.update(url)
@@ -111,7 +123,26 @@ def main():
             strip = True
    
     key = keyfile()
-    password = getpass()
+    saved_hash = hashfile()
+
+    confirmed = False
+    attempts = 0
+    while not confirmed and attempts < 5:
+        attempts += 1
+        password = getpass()
+        if saved_hash is None:
+            password_conf = getpass("Confirm:")
+            if password != password_conf:
+                log('Passwords do not match.\n')
+                continue
+            save_hashfile(sha256(password + key).hexdigest())
+            confirmed = True
+        else:
+            if sha256(password + key).hexdigest() != saved_hash:
+                log('Passwords do not match.\n')
+                continue
+            confirmed = True
+
     mashed = pretty(mash(key, url, password))
     if strip:
         mashed = ''.join(c for c in mashed if c.isalnum())
